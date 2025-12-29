@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, setYear, setMonth, parseISO } from 'date-fns';
 import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { signOut } from 'firebase/auth';
+import { db, auth } from '../firebase';
 
 export default function MonthView({ user, onSelectDate }: any) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -27,6 +28,12 @@ export default function MonthView({ user, onSelectDate }: any) {
 
   useEffect(() => { fetchData(); }, [currentMonth, user.uid]);
 
+  const handleLogout = () => {
+    if (window.confirm('로그아웃 하시겠습니까?')) {
+      signOut(auth);
+    }
+  };
+
   const deleteMemo = async (memoId: string) => {
     if (window.confirm('이 메모를 삭제할까요?')) {
       await deleteDoc(doc(db, `users/${user.uid}/future_memos`, memoId));
@@ -45,8 +52,26 @@ export default function MonthView({ user, onSelectDate }: any) {
   });
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}> {/* 전체 폭을 1000px로 확대 */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}> {/* 간격을 60px로 대폭 확대 */}
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px 20px 60px 20px' }}>
+      {/* 🚪 로그아웃 버튼 (우측 상단) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+        <button 
+          onClick={handleLogout}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: '#bbb', 
+            cursor: 'pointer', 
+            fontSize: '0.85rem',
+            textDecoration: 'underline',
+            padding: '5px'
+          }}
+        >
+          로그아웃
+        </button>
+      </div>
+
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}>
         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem', color: '#333' }}>←</button>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -63,7 +88,7 @@ export default function MonthView({ user, onSelectDate }: any) {
 
       {futureMemos.length > 0 && (
         <div style={{ backgroundColor: '#eee9e0', padding: '30px', borderRadius: '15px', marginBottom: '50px', color: '#333', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-          <h4 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: '700', letterSpacing: '-0.02em' }}>과거에서 온 편지</h4>
+          <h4 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: '700' }}>과거에서 온 편지</h4>
           {futureMemos.map((m) => (
             <div key={m.id} style={{ display: 'flex', flexDirection: 'column', padding: '15px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -78,14 +103,13 @@ export default function MonthView({ user, onSelectDate }: any) {
         </div>
       )}
 
-      {/* 📅 달력 크기 확대 및 디자인 조정 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
         {['일','월','화','수','목','금','토'].map(d => (
           <div key={d} style={{ textAlign: 'center', padding: '20px 0', fontWeight: '600', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0', color: d === '일' ? '#ef5350' : '#555', fontSize: '0.9rem' }}>{d}</div>
         ))}
         {days.map(day => (
           <div key={day.toString()} onClick={() => onSelectDate(format(day, 'yyyy-MM-dd'))} style={{ 
-            height: '140px', // 날짜 칸 높이 확대 (기존보다 훨씬 크게)
+            height: '140px', 
             borderBottom: '1px solid #f0f0f0', 
             borderRight: '1px solid #f0f0f0', 
             padding: '15px', 
