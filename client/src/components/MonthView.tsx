@@ -34,12 +34,9 @@ export default function MonthView({ user, onSelectDate }: any) {
     }
   };
 
-  // 💡 메모의 작성 날짜로 이동하는 함수
   const goToDate = (dateStr: string) => {
     const targetDate = parseISO(dateStr);
-    setCurrentMonth(targetDate); // 해당 월로 달력 이동
-    // 상세 페이지까지 바로 열고 싶다면 아래 주석을 해제하세요
-    // onSelectDate(dateStr); 
+    setCurrentMonth(targetDate);
   };
 
   const days = eachDayOfInterval({
@@ -48,34 +45,32 @@ export default function MonthView({ user, onSelectDate }: any) {
   });
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '15px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>←</button>
-        <div style={{ display: 'flex', gap: '5px' }}>
-          <select value={currentMonth.getFullYear()} onChange={(e) => setCurrentMonth(setYear(currentMonth, parseInt(e.target.value)))} style={{ padding: '5px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem', fontFamily: "'Noto Sans KR', sans-serif" }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}> {/* 전체 폭을 1000px로 확대 */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}> {/* 간격을 60px로 대폭 확대 */}
+        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem', color: '#333' }}>←</button>
+
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <select value={currentMonth.getFullYear()} onChange={(e) => setCurrentMonth(setYear(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee', fontSize: '1.1rem', fontWeight: '500', backgroundColor: '#fff', cursor: 'pointer' }}>
             {years.map(y => <option key={y} value={y}>{y}년</option>)}
           </select>
-          <select value={currentMonth.getMonth()} onChange={(e) => setCurrentMonth(setMonth(currentMonth, parseInt(e.target.value)))} style={{ padding: '5px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem', fontFamily: "'Noto Sans KR', sans-serif" }}>
+          <select value={currentMonth.getMonth()} onChange={(e) => setCurrentMonth(setMonth(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee', fontSize: '1.1rem', fontWeight: '500', backgroundColor: '#fff', cursor: 'pointer' }}>
             {months.map(m => <option key={m} value={m}>{m + 1}월</option>)}
           </select>
         </div>
-        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>→</button>
+
+        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem', color: '#333' }}>→</button>
       </header>
 
       {futureMemos.length > 0 && (
-        <div style={{ backgroundColor: '#eee9e0', padding: '20px', borderRadius: '12px', marginBottom: '30px', color: '#333' }}>
-          <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', fontWeight: '700' }}>과거에서 온 편지</h4>
+        <div style={{ backgroundColor: '#eee9e0', padding: '30px', borderRadius: '15px', marginBottom: '50px', color: '#333', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+          <h4 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: '700', letterSpacing: '-0.02em' }}>과거에서 온 편지</h4>
           {futureMemos.map((m) => (
-            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', padding: '12px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', padding: '15px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '1.05rem', lineHeight: '1.5', flex: 1 }}>{m.text}</span>
-                <button onClick={() => deleteMemo(m.id)} style={{ border: 'none', background: 'none', color: '#999', cursor: 'pointer', fontSize: '0.75rem', marginLeft: '15px' }}>삭제</button>
+                <span style={{ fontSize: '1.1rem', lineHeight: '1.6', flex: 1 }}>{m.text}</span>
+                <button onClick={() => deleteMemo(m.id)} style={{ border: 'none', background: 'none', color: '#999', cursor: 'pointer', fontSize: '0.8rem', marginLeft: '20px' }}>삭제</button>
               </div>
-              {/* 💡 작성 날짜 표시 및 클릭 시 이동 링크 */}
-              <div 
-                onClick={() => goToDate(m.fromDate)}
-                style={{ fontSize: '0.8rem', color: '#888', marginTop: '8px', cursor: 'pointer', textDecoration: 'underline', alignSelf: 'flex-start' }}
-              >
+              <div onClick={() => goToDate(m.fromDate)} style={{ fontSize: '0.85rem', color: '#888', marginTop: '10px', cursor: 'pointer', textDecoration: 'underline' }}>
                 {m.fromDate}에 작성함
               </div>
             </div>
@@ -83,13 +78,28 @@ export default function MonthView({ user, onSelectDate }: any) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-        {['일','월','화','수','목','금','토'].map(d => <div key={d} style={{ textAlign: 'center', padding: '10px 0', fontWeight: 'bold', backgroundColor: '#fafafa', borderBottom: '1px solid #eee', fontSize: '0.85rem' }}>{d}</div>)}
+      {/* 📅 달력 크기 확대 및 디자인 조정 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
+        {['일','월','화','수','목','금','토'].map(d => (
+          <div key={d} style={{ textAlign: 'center', padding: '20px 0', fontWeight: '600', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0', color: d === '일' ? '#ef5350' : '#555', fontSize: '0.9rem' }}>{d}</div>
+        ))}
         {days.map(day => (
-          <div key={day.toString()} onClick={() => onSelectDate(format(day, 'yyyy-MM-dd'))} style={{ height: '80px', borderBottom: '1px solid #eee', borderRight: '1px solid #eee', padding: '8px', cursor: 'pointer', backgroundColor: isSameMonth(day, currentMonth) ? '#fff' : '#fcfcfc' }}>
-            <div style={{ fontSize: '0.85rem', color: isSameDay(day, new Date()) ? '#2196f3' : '#666', fontWeight: isSameDay(day, new Date()) ? 'bold' : 'normal' }}>{format(day, 'd')}</div>
-            <div style={{ fontSize: '0.65rem', color: '#999', marginTop: '5px', overflow: 'hidden', height: '40px' }}>
-              {entries[format(day, 'yyyy-MM-dd')]?.content?.replace(/<[^>]*>/g, '').substring(0, 15)}
+          <div key={day.toString()} onClick={() => onSelectDate(format(day, 'yyyy-MM-dd'))} style={{ 
+            height: '140px', // 날짜 칸 높이 확대 (기존보다 훨씬 크게)
+            borderBottom: '1px solid #f0f0f0', 
+            borderRight: '1px solid #f0f0f0', 
+            padding: '15px', 
+            cursor: 'pointer', 
+            backgroundColor: isSameMonth(day, currentMonth) ? '#fff' : '#f9f9f9',
+            transition: 'background-color 0.2s'
+          }}>
+            <div style={{ 
+              fontSize: '1rem', 
+              color: isSameDay(day, new Date()) ? '#2196f3' : (format(day, 'E') === 'Sun' ? '#ef5350' : '#666'), 
+              fontWeight: isSameDay(day, new Date()) ? '800' : '500' 
+            }}>{format(day, 'd')}</div>
+            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '12px', lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+              {entries[format(day, 'yyyy-MM-dd')]?.content?.replace(/<[^>]*>/g, '').substring(0, 30)}
             </div>
           </div>
         ))}
