@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function DetailPage({ uid, date, onBack }: any) {
-  const [content, setContent] = useState('');
-  const [color, setColor] = useState('#333333'); // 기본 글씨 색 (진한 회색)
+  const editorRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
 
   // 7가지 색상 리스트
@@ -18,28 +17,31 @@ export default function DetailPage({ uid, date, onBack }: any) {
     { name: 'Purple', value: '#9c27b0' }
   ];
 
-  // 1. 기존 데이터(내용 + 색상) 불러오기
+  // 1. 기존 데이터 불러오기 (HTML 구조 그대로 가져옴)
   useEffect(() => {
     const fetchData = async () => {
       const docRef = doc(db, `users/${uid}/entries`, date);
       const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setContent(data.content || '');
-        setColor(data.color || '#333333'); // 저장된 색이 있으면 불러오기
+      if (docSnap.exists() && editorRef.current) {
+        editorRef.current.innerHTML = docSnap.data().content || '';
       }
     };
     fetchData();
   }, [uid, date]);
 
-  // 2. 내용이나 색상이 바뀔 때마다 자동 저장
-  useEffect(() => {
+  // 2. 색상 변경 함수 (드래그한 부분이나 앞으로 쓸 글자색 변경)
+  const changeColor = (colorValue: string) => {
+    document.execCommand('foreColor', false, colorValue);
+    if (editorRef.current) editorRef.current.focus();
+  };
+
+  // 3. 자동 저장 (내용 변경 감지)
+  const handleInput = () => {
     const delayDebounceFn = setTimeout(async () => {
-      if (content || color !== '#333333') {
+      if (editorRef.current) {
         setSaving(true);
         await setDoc(doc(db, `users/${uid}/entries`, date), {
-          content: content,
-          color: color, // 선택한 색상 저장
+          content: editorRef.current.innerHTML, // HTML 구조(색상 포함)를 통째로 저장
           updatedAt: new Date()
         });
         setSaving(false);
@@ -47,7 +49,7 @@ export default function DetailPage({ uid, date, onBack }: any) {
     }, 1000);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [content, color, uid, date]);
+  };
 
   return (
     <div style={{ padding: '30px', maxWidth: '800px', margin: '0 auto', fontFamily: 'serif' }}>
@@ -60,43 +62,45 @@ export default function DetailPage({ uid, date, onBack }: any) {
         <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{saving ? '저장 중...' : '저장 완료'}</span>
       </div>
 
-      {/* 🎨 색상 선택 버튼 7개 */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '15px' }}>
+      {/* 🎨 색상 선택 버튼 */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '15px', position: 'sticky', top: '10px', zIndex: 10 }}>
         {colors.map((c) => (
           <button
             key={c.value}
-            onClick={() => setColor(c.value)}
+            onMouseDown={(e) => {
+              e.preventDefault(); // 포커스 해제 방지
+              changeColor(c.value);
+            }}
             style={{
               width: '30px',
               height: '30px',
               borderRadius: '50%',
               backgroundColor: c.value,
-              border: color === c.value ? '3px solid #333' : '1px solid #ddd',
-              cursor: 'pointer',
-              transition: 'transform 0.1s'
+              border: '1px solid #ddd',
+              cursor: 'pointer'
             }}
-            title={c.name}
           />
         ))}
-        <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#666', alignSelf: 'center' }}>펜 색상 선택</div>
+        <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#666', alignSelf: 'center' }}>원하는 곳을 드래그하고 색을 누르세요</div>
       </div>
 
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="이곳에 당신의 시간을 기록하세요..."
+      {/* 📝 편집 가능한 영역 (textarea 대신 사용) */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
         style={{
           width: '100%',
-          height: '500px',
+          minHeight: '500px',
           padding: '20px',
           fontSize: '1.2rem',
           lineHeight: '1.8',
           border: '1px solid #eee',
           borderRadius: '10px',
           outline: 'none',
-          color: color, // 선택한 색상이 글씨에 적용됩니다
-          resize: 'none',
-          backgroundColor: '#fff'
+          backgroundColor: '#fff',
+          whiteSpace: 'pre-wrap',
+          overflowY: 'auto'
         }}
       />
     </div>
