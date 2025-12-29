@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function DetailPage({ uid, date, onBack }: any) {
@@ -21,7 +21,7 @@ export default function DetailPage({ uid, date, onBack }: any) {
   }, [uid, date]);
 
   const handleFutureMemo = () => {
-    const text = window.getSelection()?.toString();
+    const text = window.getSelection()?.toString().trim();
     if (!text) return alert('글자를 드래그한 후 눌러주세요!');
     setSelectedText(text);
     setShowModal(true);
@@ -32,7 +32,7 @@ export default function DetailPage({ uid, date, onBack }: any) {
     await addDoc(collection(db, `users/${uid}/future_memos`), {
       text: selectedText,
       targetMonth,
-      fromDate: date,
+      fromDate: date, // 어느 날짜 일기에서 보냈는지 기록
       createdAt: new Date()
     });
     alert('미래로 메모를 보냈습니다!');
@@ -41,12 +41,35 @@ export default function DetailPage({ uid, date, onBack }: any) {
 
   const changeColor = (color: string) => document.execCommand('foreColor', false, color);
 
-  const handleInput = () => {
+  // 💡 본문 수정 시 미래 메모와 대조하여 삭제하는 로직
+  const handleInput = async () => {
     setSaving(true);
-    setDoc(doc(db, `users/${uid}/entries`, date), {
-      content: editorRef.current?.innerHTML,
+    const newContent = editorRef.current?.innerHTML || '';
+    const plainText = editorRef.current?.innerText || '';
+
+    // 1. 본문 내용 저장
+    await setDoc(doc(db, `users/${uid}/entries`, date), {
+      content: newContent,
       updatedAt: new Date()
-    }).then(() => setSaving(false));
+    });
+
+    // 2. 이 날짜(date)에서 보냈던 미래 메모들 가져오기
+    const q = query(
+      collection(db, `users/${uid}/future_memos`), 
+      where("fromDate", "==", date)
+    );
+    const querySnapshot = await getDocs(q);
+
+    // 3. 미래 메모의 텍스트가 본문(plainText)에 없으면 삭제
+    querySnapshot.forEach(async (memoDoc) => {
+      const memoData = memoDoc.data();
+      if (!plainText.includes(memoData.text)) {
+        await deleteDoc(doc(db, `users/${uid}/future_memos`, memoDoc.id));
+        console.log("본문에서 사라진 미래 메모를 삭제했습니다.");
+      }
+    });
+
+    setSaving(false);
   };
 
   return (
