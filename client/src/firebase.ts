@@ -2,15 +2,18 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// 환경 변수가 없을 경우를 대비한 안전 장치 추가
+// Replit Secrets에서 직접 값을 읽어옵니다.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-console.log("Firebase 연결 시도 중..."); // 연결 확인용 로그
+// 설정값이 하나라도 비어있으면 경고를 띄웁니다.
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error("Firebase 설정값이 누락되었습니다. Secrets 탭을 확인해주세요.");
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
