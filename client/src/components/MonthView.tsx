@@ -35,10 +35,10 @@ export default function MonthView({ user, onSelectDate }: any) {
   };
 
   const downloadPDF = () => {
-    const element = document.getElementById('full-report');
+    const element = document.getElementById('pdf-root');
     const options = {
       margin: 10,
-      filename: `${format(currentMonth, 'yyyy년 MM월')} 기록장.pdf`,
+      filename: `${format(currentMonth, 'yyyy년 MM월')} 일기장.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -46,15 +46,6 @@ export default function MonthView({ user, onSelectDate }: any) {
     };
     html2pdf().set(options).from(element).save();
   };
-
-  const deleteMemo = async (memoId: string) => {
-    if (window.confirm('이 메모를 삭제할까요?')) {
-      await deleteDoc(doc(db, `users/${user.uid}/future_memos`, memoId));
-      fetchData();
-    }
-  };
-
-  const goToDate = (dateStr: string) => setCurrentMonth(parseISO(dateStr));
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth)),
@@ -67,72 +58,62 @@ export default function MonthView({ user, onSelectDate }: any) {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px 20px 60px 20px' }}>
-      {/* 상단 버튼 영역 (여기는 PDF에 안 나옴) */}
+      {/* 🛠️ 상단 메뉴 버튼 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px', gap: '15px' }}>
         <button onClick={downloadPDF} style={{ background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '5px', padding: '8px 15px', cursor: 'pointer', fontSize: '0.85rem' }}>PDF 통합 저장</button>
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline' }}>로그아웃</button>
       </div>
 
-      <div id="full-report">
-        {/* 달력 헤더 */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}>
-          <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem' }}>←</button>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <select value={currentMonth.getFullYear()} onChange={(e) => setCurrentMonth(setYear(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee' }}>
-              {years.map(y => <option key={y} value={y}>{y}년</option>)}
-            </select>
-            <select value={currentMonth.getMonth()} onChange={(e) => setCurrentMonth(setMonth(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee' }}>
-              {months.map(m => <option key={m} value={m}>{m + 1}월</option>)}
-            </select>
-          </div>
-          <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem' }}>→</button>
-        </header>
+      {/* 📅 화면에 보이는 달력 영역 (클릭 기능 보장) */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}>
+        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem' }}>←</button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <select value={currentMonth.getFullYear()} onChange={(e) => setCurrentMonth(setYear(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee' }}>
+            {years.map(y => <option key={y} value={y}>{y}년</option>)}
+          </select>
+          <select value={currentMonth.getMonth()} onChange={(e) => setCurrentMonth(setMonth(currentMonth, parseInt(e.target.value)))} style={{ padding: '8px 15px', borderRadius: '10px', border: '1px solid #eee' }}>
+            {months.map(m => <option key={m} value={m}>{m + 1}월</option>)}
+          </select>
+        </div>
+        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem' }}>→</button>
+      </header>
 
-        {/* 과거 메모 영역 */}
-        {futureMemos.length > 0 && (
-          <div style={{ backgroundColor: '#eee9e0', padding: '30px', borderRadius: '15px', marginBottom: '50px' }}>
-            <h4 style={{ margin: '0 0 20px 0' }}>과거에서 온 편지</h4>
-            {futureMemos.map((m) => (
-              <div key={m.id} style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                <span onClick={() => goToDate(m.fromDate)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{m.text} ({m.fromDate} 작성)</span>
-                <button onClick={() => deleteMemo(m.id)} style={{ border: 'none', background: 'none', color: '#999', cursor: 'pointer' }}>삭제</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 달력 본문 (onClick 다시 추가됨!) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
-          {['일','월','화','수','목','금','토'].map(d => (
-            <div key={d} style={{ textAlign: 'center', padding: '20px 0', fontWeight: '600', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>{d}</div>
-          ))}
-          {days.map(day => (
-            <div 
-              key={day.toString()} 
-              onClick={() => onSelectDate(format(day, 'yyyy-MM-dd'))} // 👈 이 기능이 돌아왔습니다!
-              style={{ 
-                height: '140px', borderBottom: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0', padding: '15px', cursor: 'pointer',
-                backgroundColor: isSameMonth(day, currentMonth) ? '#fff' : '#f9f9f9'
-              }}
-            >
-              <div style={{ fontWeight: '800', color: isSameDay(day, new Date()) ? '#2196f3' : '#666' }}>{format(day, 'd')}</div>
-              <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '12px', lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                {entries[format(day, 'yyyy-MM-dd')]?.content?.replace(/<[^>]*>/g, '').substring(0, 30)}
-              </div>
-            </div>
+      {futureMemos.length > 0 && (
+        <div style={{ backgroundColor: '#eee9e0', padding: '30px', borderRadius: '15px', marginBottom: '50px' }}>
+          <h4 style={{ margin: '0 0 20px 0' }}>과거에서 온 편지</h4>
+          {futureMemos.map((m) => (
+            <div key={m.id} style={{ marginBottom: '10px' }}>• {m.text} ({m.fromDate} 작성)</div>
           ))}
         </div>
+      )}
 
-        {/* PDF 상세 페이지 영역 (화면에서는 구분선으로만 보임) */}
-        <div className="pdf-only" style={{ marginTop: '80px', paddingTop: '40px', borderTop: '2px solid #333' }}>
-          <h2 style={{ marginBottom: '30px' }}>상세 일기 기록</h2>
-          {sortedEntryKeys.map(dateKey => (
-            <div key={dateKey} style={{ marginBottom: '40px', pageBreakInside: 'avoid' }}>
-              <h3 style={{ backgroundColor: '#f5f5f5', padding: '10px' }}>{dateKey}</h3>
-              <div dangerouslySetInnerHTML={{ __html: entries[dateKey].content }} style={{ padding: '10px 20px', lineHeight: '1.8' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
+        {['일','월','화','수','목','금','토'].map(d => (
+          <div key={d} style={{ textAlign: 'center', padding: '20px 0', fontWeight: '600', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>{d}</div>
+        ))}
+        {days.map(day => (
+          <div 
+            key={day.toString()} 
+            onClick={() => onSelectDate(format(day, 'yyyy-MM-dd'))} 
+            style={{ height: '140px', borderBottom: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0', padding: '15px', cursor: 'pointer', backgroundColor: isSameMonth(day, currentMonth) ? '#fff' : '#f9f9f9' }}
+          >
+            <div style={{ fontWeight: '800', color: isSameDay(day, new Date()) ? '#2196f3' : '#666' }}>{format(day, 'd')}</div>
+            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '12px' }}>
+              {entries[format(day, 'yyyy-MM-dd')]?.content?.replace(/<[^>]*>/g, '').substring(0, 30)}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 📑 PDF용 숨겨진 영역 (이 영역이 PDF 파일로 만들어짐) */}
+      <div id="pdf-root" style={{ display: 'none' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '50px' }}>{format(currentMonth, 'yyyy년 MM월')} 일기 기록장</h1>
+        {sortedEntryKeys.map(dateKey => (
+          <div key={dateKey} style={{ marginBottom: '50px', pageBreakInside: 'avoid' }}>
+            <h2 style={{ borderBottom: '1px solid #333', paddingBottom: '10px' }}>{dateKey}</h2>
+            <div dangerouslySetInnerHTML={{ __html: entries[dateKey].content }} style={{ lineHeight: '1.8', paddingTop: '10px' }} />
+          </div>
+        ))}
       </div>
     </div>
   );
