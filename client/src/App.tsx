@@ -1,60 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import { auth } from './firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-// 📁 파일들이 components/ui/ 폴더 안에 있으므로 경로를 모두 수정했습니다.
-import CalendarView from './components/ui/calendar';
-import SearchBar from './components/ui/SearchBar';
+import React, { useEffect, useState } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, googleProvider } from './firebase';
+import { signInWithPopup } from 'firebase/auth';
+import MonthView from './components/MonthView';
 import DetailPage from './components/DetailPage';
-import Auth from './components/Auth';
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [highlight, setHighlight] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
     return () => unsubscribe();
   }, []);
 
-  // ✨ 검색 결과 클릭 시 세부 페이지로 이동하는 함수
-  const handleSelectResult = (date: string, searchKeyword: string) => {
-    setHighlight(searchKeyword);
-    setSelectedDate(date);
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert("로그인에 실패했습니다.");
+    }
   };
 
-  if (!user) return <Auth />;
+  if (loading) return <div style={{ padding: '20px' }}>Loading...</div>;
+
+  if (!user) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Century Gothic, sans-serif' }}>
+      <h1>Being and Time</h1>
+      <button onClick={handleLogin} style={{ padding: '10px 20px', cursor: 'pointer', borderRadius: '20px', border: '1px solid #ddd' }}>
+        Google 계정으로 시작하기
+      </button>
+    </div>
+  );
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <SearchBar user={user} onSelectResult={handleSelectResult} />
-        <button 
-          onClick={() => signOut(auth)} 
-          style={{ padding: '8px 16px', background: '#eee', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          로그아웃
-        </button>
-      </div>
-
+    <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
       {selectedDate ? (
+        /* 이제 임시 텍스트 상자가 아니라 진짜 DetailPage를 보여줍니다 */
         <DetailPage 
-          user={user} 
+          uid={user.uid} 
           date={selectedDate} 
-          highlight={highlight} 
-          onBack={() => {
-            setSelectedDate(null);
-            setHighlight('');
-          }} 
+          onBack={() => setSelectedDate(null)} 
         />
       ) : (
-        <CalendarView 
-          user={user} 
-          onSelectDate={(date: string) => {
-            setHighlight('');
-            setSelectedDate(date);
-          }} 
-        />
+        <MonthView user={user} onSelectDate={setSelectedDate} />
       )}
     </div>
   );

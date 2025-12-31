@@ -1,87 +1,135 @@
-import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useRef } from 'react';
+import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { parseISO } from 'date-fns'; // 💡 이 부분이 빠져서 에러가 났을 거예요!
 
-export default function DetailPage({ user, date, onBack, highlight }: any) {
-  const [content, setContent] = useState('');
-  const [memo, setMemo] = useState('');
+export default function DetailPage({ uid, date, onBack }: any) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
   const [targetMonth, setTargetMonth] = useState('');
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!user?.uid || !date) return;
-
-      const docRef = doc(db, `users/${user.uid}/entries`, date);
+    const fetchData = async () => {
+      const docRef = doc(db, `users/${uid}/entries`, date);
       const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const rawContent = docSnap.data().content || '';
-
-        // ✨ 검색어가 있을 때만 '보여주기용'으로 하이라이트 처리
-        if (highlight && typeof highlight === 'string' && highlight.trim() !== '') {
-          const safeHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp(`(${safeHighlight})`, 'gi');
-          // 원본 내용은 건드리지 않고, 화면에 보일 때만 노란 배경 추가
-          const highlighted = rawContent.replace(regex, '<mark style="background-color: #ffeb3b;">$1</mark>');
-          setContent(highlighted);
-        } else {
-          setContent(rawContent);
-        }
+      if (docSnap.exists() && editorRef.current) {
+        editorRef.current.innerHTML = docSnap.data().content || '';
       }
     };
-    loadData();
-  }, [user?.uid, date, highlight]);
+    fetchData();
+  }, [uid, date]);
 
-  const saveEntry = async () => {
-    // ⚠️ 중요: 저장할 때는 하이라이트용 태그(<mark>)를 모두 제거하고 순수 글자만 저장
-    const cleanContent = content.replace(/<mark[^>]*>|<\/mark>/g, '');
-    await setDoc(doc(db, `users/${user.uid}/entries`, date), { content: cleanContent });
-    alert('저장되었습니다.');
+  const handleFutureMemo = () => {
+    const text = window.getSelection()?.toString().trim();
+    if (!text) return alert('글자를 드래그한 후 눌러주세요!');
+    setSelectedText(text);
+    setShowModal(true);
   };
 
-  const sendFutureMemo = async () => {
-    if (!memo || !targetMonth) return alert('내용과 목표 월을 입력하세요.');
-    await addDoc(collection(db, `users/${user.uid}/future_memos`), {
-      text: memo,
+  const saveFutureMemo = async () => {
+    if (!targetMonth) return alert('월을 선택해주세요.');
+    await addDoc(collection(db, `users/${uid}/future_memos`), {
+      text: selectedText,
       targetMonth,
       fromDate: date,
       createdAt: new Date()
     });
-    alert('미래로 전송되었습니다!');
-    setMemo('');
+    alert('미래로 메모를 보냈습니다!');
+    setShowModal(false);
+  };
+
+  const changeColor = (color: string) => document.execCommand('foreColor', false, color);
+
+  const handleInput = async () => {
+    setSaving(true);
+    const newContent = editorRef.current?.innerHTML || '';
+    const plainText = editorRef.current?.innerText || '';
+
+    await setDoc(doc(db, `users/${uid}/entries`, date), {
+      content: newContent,
+      updatedAt: new Date()
+    });
+
+    const q = query(collection(db, `users/${uid}/future_memos`), where("fromDate", "==", date));
+    const querySnapshot = await getDocs(q);
+
+    querySnapshot.forEach(async (memoDoc) => {
+      const memoData = memoDoc.data();
+      if (!plainText.includes(memoData.text)) {
+        await deleteDoc(doc(db, `users/${uid}/future_memos`, memoDoc.id));
+      }
+    });
+
+    setSaving(false);
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      <button onClick={onBack} style={{ marginBottom: '20px', background: 'none', border: 'none', cursor: 'pointer', color: '#2196f3', fontSize: '1rem' }}>← 달력으로 돌아가기</button>
-
-      <h2 style={{ marginBottom: '20px' }}>{date}의 기록</h2>
-
-      <div style={{ marginBottom: '40px', backgroundColor: '#fff' }}>
-        <ReactQuill 
-          theme="snow" 
-          value={content} 
-          onChange={setContent} 
-          style={{ height: '400px', marginBottom: '50px' }} 
-        />
-        <button onClick={saveEntry} style={{ width: '100%', padding: '15px', background: '#333', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>기록 저장하기</button>
-      </div>
-
-      <div style={{ padding: '30px', backgroundColor: '#eee9e0', borderRadius: '15px' }}>
-        <h3 style={{ marginTop: 0 }}>💌 미래의 나에게 보내는 메모</h3>
-        <textarea 
-          value={memo} 
-          onChange={(e) => setMemo(e.target.value)} 
-          placeholder="먼 훗날 이 달의 달력에 나타날 메시지를 적어보세요." 
-          style={{ width: '100%', height: '100px', padding: '15px', borderRadius: '10px', border: '1px solid #d1c8b8', marginBottom: '15px' }} 
-        />
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #d1c8b8' }} />
-          <button onClick={sendFutureMemo} style={{ flex: 1, background: '#8b7e66', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>전송하기</button>
+    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', alignItems: 'center' }}>
+        <button onClick={onBack} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>←</button>
+        <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#333' }}>{date}</span>
+        <div style={{ display: 'flex', gap: '8px', marginLeft: '10px' }}>
+          {['#ef5350', '#ff9800', '#fdd835', '#4caf50', '#2196f3', '#3f51b5', '#9c27b0'].map(c => (
+            <button key={c} onMouseDown={(e) => { e.preventDefault(); changeColor(c); }} style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: c, border: 'none', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
+          ))}
         </div>
+
+        {/* 🖤 요청하신 세련된 검정색 버튼 */}
+        <button 
+          onClick={handleFutureMemo} 
+          style={{ 
+            marginLeft: 'auto', 
+            backgroundColor: '#1a1a1a', 
+            color: '#ffffff', 
+            border: 'none', 
+            borderRadius: '8px', 
+            padding: '8px 18px', 
+            cursor: 'pointer', 
+            fontSize: '0.85rem', 
+            fontWeight: 500,
+            letterSpacing: '-0.02em',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>✉</span> 미래로 보내기
+        </button>
       </div>
+
+      <div 
+        ref={editorRef} 
+        contentEditable 
+        onInput={handleInput} 
+        style={{ 
+          minHeight: '600px', 
+          outline: 'none', 
+          fontFamily: "'Noto Sans KR', sans-serif",
+          fontSize: '1.1rem', 
+          lineHeight: '2.2', 
+          padding: '40px', 
+          backgroundColor: '#fff', 
+          borderRadius: '5px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+          backgroundImage: 'linear-gradient(#f1f1f1 1px, transparent 1px)',
+          backgroundSize: '100% 2.2rem',
+          color: '#444'
+        }} 
+      />
+
+      {showModal && (
+        <div style={{ position: 'fixed', top:0, left:0, width:'100%', height:'100%', backgroundColor:'rgba(0,0,0,0.5)', display:'flex', justifyContent:'center', alignItems:'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor:'#fff', padding:'25px', borderRadius:'15px', width:'300px' }}>
+            <h4 style={{ margin: '0 0 15px 0' }}>미래의 언제 보여줄까요?</h4>
+            <input type="month" onChange={(e)=>setTargetMonth(e.target.value)} style={{ width:'100%', padding:'10px', marginBottom: '15px', boxSizing: 'border-box' }} />
+            <button onClick={saveFutureMemo} style={{ width:'100%', padding:'12px', backgroundColor:'#1a1a1a', color:'#fff', border:'none', borderRadius:'10px', cursor:'pointer', marginBottom: '10px' }}>저장하기</button>
+            <button onClick={()=>setShowModal(false)} style={{ width:'100%', padding:'10px', background:'none', border:'none', color:'#888', cursor:'pointer' }}>취소</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
