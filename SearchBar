@@ -1,0 +1,57 @@
+import React, { useState } from 'react';
+import { collection, query, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
+
+export default function SearchBar({ user, onSelectResult }: any) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
+    try {
+      const q = query(collection(db, `users/${user.uid}/entries`));
+      const querySnapshot = await getDocs(q);
+      const searchResults: any[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const content = doc.data().content || '';
+        if (content.toLowerCase().includes(searchTerm.toLowerCase())) {
+          searchResults.push({ id: doc.id, ...doc.data() });
+        }
+      });
+      setResults(searchResults);
+    } catch (error) {
+      console.error("검색 에러:", error);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '300px' }}>
+      <div style={{ display: 'flex', gap: '5px' }}>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="검색어를 입력하세요..."
+          style={{ width: '100%', padding: '10px', borderRadius: '20px', border: '1px solid #2196f3' }}
+        />
+        <button onClick={handleSearch} style={{ padding: '8px 15px', background: '#2196f3', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer' }}>검색</button>
+      </div>
+
+      {results.length > 0 && (
+        <div style={{ position: 'absolute', top: '45px', left: 0, right: 0, background: 'white', border: '1px solid #ddd', borderRadius: '10px', zIndex: 1000, maxHeight: '300px', overflowY: 'auto', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+          {results.map((res) => (
+            <div key={res.id} onClick={() => { onSelectResult(res.id, searchTerm); setResults([]); setSearchTerm(''); }} style={{ padding: '12px', borderBottom: '1px solid #f9f9f9', cursor: 'pointer' }}>
+              <div style={{ fontWeight: 'bold', color: '#2196f3' }}>{res.id}</div>
+              <div style={{ color: '#666', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {res.content.replace(/<[^>]*>/g, '')}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
