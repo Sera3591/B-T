@@ -1,54 +1,42 @@
-import React, { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
-import { signInWithPopup } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
 import MonthView from './components/MonthView';
 import DetailPage from './components/DetailPage';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login Error:", error);
-      alert("로그인에 실패했습니다.");
-    }
-  };
-
-  if (loading) return <div style={{ padding: '20px' }}>Loading...</div>;
-
-  if (!user) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Century Gothic, sans-serif' }}>
-      <h1>Being and Time</h1>
-      <button onClick={handleLogin} style={{ padding: '10px 20px', cursor: 'pointer', borderRadius: '20px', border: '1px solid #ddd' }}>
-        Google 계정으로 시작하기
-      </button>
-    </div>
-  );
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>로딩 중...</div>;
+  if (!user) return <div style={{ padding: '50px', textAlign: 'center' }}>구글 로그인이 필요합니다.</div>;
 
   return (
-    <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
+    <div>
       {selectedDate ? (
-        /* 이제 임시 텍스트 상자가 아니라 진짜 DetailPage를 보여줍니다 */
         <DetailPage 
           uid={user.uid} 
           date={selectedDate} 
           onBack={() => setSelectedDate(null)} 
+          highlightTerm={searchTerm} 
         />
       ) : (
-        <MonthView user={user} onSelectDate={setSelectedDate} />
+        <MonthView 
+          user={user} 
+          onSelectDate={(date: string) => setSelectedDate(date)}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm} 
+        />
       )}
     </div>
   );
