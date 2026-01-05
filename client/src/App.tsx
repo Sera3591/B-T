@@ -1,41 +1,60 @@
 import React, { useState, useEffect } from 'react';
+import { auth, googleProvider } from './firebase';
+import { onAuthStateChanged, signInWithPopup, User } from 'firebase/auth';
 import MonthView from './components/MonthView';
 import DetailPage from './components/DetailPage';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(""); // 검색어 상태 관리
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>로딩 중...</div>;
-  if (!user) return <div style={{ padding: '50px', textAlign: 'center' }}>구글 로그인이 필요합니다.</div>;
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert("로그인에 실패했습니다.");
+    }
+  };
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>로딩 중...</div>;
+
+  if (!user) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#eee9e0' }}>
+        <h1 style={{ marginBottom: '20px' }}>존재와 시간</h1>
+        <button onClick={handleLogin} style={{ padding: '15px 40px', backgroundColor: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+          구글로 시작하기
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div style={{ backgroundColor: '#fcfaf7', minHeight: '100vh' }}>
       {selectedDate ? (
         <DetailPage 
           uid={user.uid} 
           date={selectedDate} 
+          searchTerm={searchTerm} // 상세 페이지로 검색어 전달
           onBack={() => setSelectedDate(null)} 
-          highlightTerm={searchTerm} 
         />
       ) : (
         <MonthView 
           user={user} 
-          onSelectDate={(date: string) => setSelectedDate(date)}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm} 
+          searchTerm={searchTerm} 
+          setSearchTerm={setSearchTerm} // 검색어 상태 동기화
+          onSelectDate={(date: string) => setSelectedDate(date)} 
         />
       )}
     </div>
