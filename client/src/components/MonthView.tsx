@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, setYear, setMonth, parseISO } from 'date-fns';
-import { collection, query, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, deleteDoc, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
 
@@ -10,6 +10,7 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
   const [futureMemos, setFutureMemos] = useState<any[]>([]);
 
   const fetchData = async () => {
+    if (!user) return;
     const qEntries = query(collection(db, `users/${user.uid}/entries`));
     const snapEntries = await getDocs(qEntries);
     const data: any = {};
@@ -17,12 +18,23 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
     setEntries(data);
 
     const monthStr = format(currentMonth, 'yyyy-MM');
-    const qMemos = collection(db, `users/${user.uid}/future_memos`);
+    const qMemos = query(collection(db, `users/${user.uid}/future_memos`), where("targetMonth", "==", monthStr));
     const snapMemos = await getDocs(qMemos);
-    setFutureMemos(snapMemos.docs.map(d => ({ id: d.id, ...d.data() })).filter((m: any) => m.targetMonth === monthStr));
+    setFutureMemos(snapMemos.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   useEffect(() => { fetchData(); }, [currentMonth, user.uid]);
+
+  // 미래 메시지 개별 삭제 함수
+  const handleDeleteMemo = async (memoId: string) => {
+    if (!window.confirm("이 메시지를 삭제하시겠습니까?")) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/future_memos`, memoId));
+      fetchData(); // 삭제 후 목록 새로고침
+    } catch (error) {
+      console.error("삭제 실패:", error);
+    }
+  };
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth)),
@@ -33,7 +45,6 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
     .filter(date => searchTerm && entries[date].content.replace(/<[^>]*>/g, '').toLowerCase().includes(searchTerm.toLowerCase()))
     .map(date => ({ date, content: entries[date].content.replace(/<[^>]*>/g, '') }));
 
-  // PDF 출력을 위해 해당 월의 일기만 정렬
   const monthKey = format(currentMonth, 'yyyy-MM');
   const sortedMonthEntries = Object.keys(entries)
     .filter(key => key.startsWith(monthKey))
@@ -41,7 +52,7 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', fontFamily: "'Noto Sans KR', sans-serif" }}>
-      {/* --- 상단 도구 (출력 시 숨김) --- */}
+      {/* 상단 도구 */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div style={{ position: 'relative', width: '350px' }}>
           <input 
@@ -61,7 +72,7 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
         </div>
       </div>
 
-      {/* --- 검색 결과 목록 (출력 시 숨김) --- */}
+      {/* 검색 결과 */}
       {searchTerm && filteredResults.length > 0 && (
         <div className="no-print" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '15px', marginBottom: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', border: '1px solid #eee' }}>
           <h4 style={{ margin: '0 0 10px 0' }}>검색 결과 ({filteredResults.length}건)</h4>
@@ -73,13 +84,35 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
         </div>
       )}
 
-      {/* --- 1페이지: 달력 섹션 --- */}
+      {/* 달력 섹션 */}
       <div className="print-page">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <button className="no-print" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>←</button>
           <h2 style={{ margin: 0 }}>{format(currentMonth, 'yyyy년 MM월')}</h2>
           <button className="no-print" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} style={{ border: 'none', background: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>→</button>
         </header>
+
+        {/* 미래 메시지 UI 개선 (두 번째 사진 스타일) */}
+        {futureMemos.length > 0 && (
+          <div style={{ marginBottom: '25px', padding: '18px', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#495057', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              💌 과거에서 도착한 편지
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {futureMemos.map(memo => (
+                <div key={memo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '10px 15px', borderRadius: '8px', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#333' }}>{memo.text}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteMemo(memo.id); }} 
+                    style={{ border: 'none', background: 'none', color: '#ced4da', cursor: 'pointer', fontSize: '1.1rem', padding: '0 5px', lineHeight: '1' }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#fff', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
           {['일','월','화','수','목','금','토'].map(d => (
@@ -87,12 +120,13 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
           ))}
           {days.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            const isMatch = searchTerm && entries[dateStr]?.content?.replace(/<[^>]*>/g, '').toLowerCase().includes(searchTerm.toLowerCase());
+            const entry = entries[dateStr];
+            const isMatch = searchTerm && entry?.content?.replace(/<[^>]*>/g, '').toLowerCase().includes(searchTerm.toLowerCase());
             return (
               <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ height: '120px', border: '0.5px solid #f0f0f0', padding: '10px', cursor: 'pointer', backgroundColor: isMatch ? '#fff9c4' : (isSameMonth(day, currentMonth) ? '#fff' : '#f9f9f9') }}>
                 <div style={{ color: isSameDay(day, new Date()) ? '#2196f3' : (format(day, 'E') === 'Sun' ? '#ef5350' : '#666'), fontWeight: 'bold' }}>{format(day, 'd')}</div>
                 <div style={{ fontSize: '0.7rem', color: '#333', marginTop: '5px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                  {entries[dateStr]?.content?.replace(/<[^>]*>/g, '')}
+                  {entry?.content?.replace(/<[^>]*>/g, '')}
                 </div>
               </div>
             );
@@ -100,7 +134,6 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
         </div>
       </div>
 
-      {/* --- 2페이지 이후: 상세 일기 섹션 (출력 시에만 보임) --- */}
       <div className="print-only">
         {sortedMonthEntries.map(dKey => (
           <div key={dKey} style={{ pageBreakBefore: 'always', padding: '40px 0' }}>
@@ -117,7 +150,6 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
           .print-only { display: block !important; }
           .print-page { page-break-after: always; }
           body { background: white !important; padding: 0 !important; }
-          .maxWidth-1000px { max-width: 100% !important; }
         }
       `}</style>
     </div>
