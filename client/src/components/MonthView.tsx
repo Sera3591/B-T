@@ -11,29 +11,16 @@ export default function MonthView({ user, onSelectDate, searchTerm, setSearchTer
 
   const fetchData = async () => {
     if (!user) return;
-
-    // 1. 기존 일기 데이터 로드 (유지)
     const qEntries = query(collection(db, `users/${user.uid}/entries`));
     const snapEntries = await getDocs(qEntries);
     const data: any = {};
     snapEntries.forEach(doc => { data[doc.id] = doc.data(); });
     setEntries(data);
 
-    // 2. 미래 메시지 로드 (색인 문제 없이 작동하는 방식)
-    const monthStr = format(currentMonth, 'yyyy-MM'); // "2026-02"
-    const qMemos = collection(db, `users/${user.uid}/future_memos`);
+    const monthStr = format(currentMonth, 'yyyy-MM');
+    const qMemos = query(collection(db, `users/${user.uid}/future_memos`), where("targetMonth", "==", monthStr));
     const snapMemos = await getDocs(qMemos);
-
-    // 서버가 아닌 브라우저에서 직접 필터링하여 색인 에러를 방지합니다.
-    const filteredMemos = snapMemos.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter((m: any) => {
-        const dbMonth = m.targetMonth;
-        // "2026-02"와 "2026-2" 형식을 모두 찾아내도록 보강했습니다.
-        return dbMonth === monthStr || dbMonth === monthStr.replace("-0", "-");
-      });
-
-    setFutureMemos(filteredMemos);
+    setFutureMemos(snapMemos.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   useEffect(() => { fetchData(); }, [currentMonth, user.uid]);
