@@ -1,14 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type InsertEntry } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { db, auth } from "@/firebase";
+import { collection, getDocs, addDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 
 export function useEntries() {
   return useQuery({
-    queryKey: [api.entries.list.path],
+    queryKey: ["entries"],
     queryFn: async () => {
-      const res = await fetch(api.entries.list.path);
-      if (!res.ok) throw new Error("Failed to fetch entries");
-      return api.entries.list.responses[200].parse(await res.json());
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+      const entriesRef = collection(db, "users", user.uid, "entries");
+      const q = query(entriesRef, orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
     },
   });
 }
@@ -16,29 +23,26 @@ export function useEntries() {
 export function useCreateEntry() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   return useMutation({
-    mutationFn: async (data: InsertEntry) => {
-      const res = await fetch(api.entries.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+    mutationFn: async (data: any) => {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+      const entriesRef = collection(db, "users", user.uid, "entries");
+      const docRef = await addDoc(entriesRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+        userId: user.uid
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to create entry");
-      }
-      return api.entries.create.responses[201].parse(await res.json());
+      return { id: docRef.id, ...data };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.entries.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
       toast({
         title: "Entry saved",
         description: "Your thought has been captured.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         variant: "destructive",
         title: "Error",
